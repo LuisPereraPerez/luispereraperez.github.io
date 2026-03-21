@@ -9,6 +9,13 @@
 <meta name="apple-mobile-web-app-title" content="Minijuegos">
 <title>Minijuegos Diarios</title>
 <link rel="manifest" href="manifest.json">
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({ appId: "c2fa0abc-8448-4ef7-8823-c4682b17d5bd" });
+  });
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <style>
@@ -960,71 +967,93 @@ function renderReminders() {
   `).join('');
 }
 
-// ── Notifications ──
-function checkNotifPermission() {
-  if (!('Notification' in window)) {
-    document.getElementById('notif-status').textContent = 'No soportado';
-    return;
+// ── Notifications (OneSignal) ──
+async function checkNotifPermission() {
+  const statusEl = document.getElementById('notif-status');
+  const banner = document.getElementById('notif-banner');
+  try {
+    const OneSignal = await getOneSignal();
+    const opted = await OneSignal.User.PushSubscription.optedIn;
+    if (opted) {
+      statusEl.textContent = 'Activadas';
+      banner.style.display = 'none';
+    } else {
+      statusEl.textContent = 'No activadas';
+      banner.style.display = 'flex';
+    }
+  } catch(e) {
+    statusEl.textContent = 'No disponible';
   }
-  const perm = Notification.permission;
-  document.getElementById('notif-status').textContent =
-    perm === 'granted' ? 'Activadas' :
-    perm === 'denied' ? 'Bloqueadas' : 'No activadas';
+}
 
-  if (perm !== 'granted') {
-    document.getElementById('notif-banner').style.display = 'flex';
-  }
+function getOneSignal() {
+  return new Promise((resolve, reject) => {
+    if (window.OneSignal) { resolve(window.OneSignal); return; }
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(os => resolve(os));
+    setTimeout(() => reject('timeout'), 5000);
+  });
 }
 
 async function requestNotifPermission() {
-  if (!('Notification' in window)) { alert('Tu navegador no soporta notificaciones'); return; }
-  const perm = await Notification.requestPermission();
-  checkNotifPermission();
-  if (perm === 'granted') {
-    document.getElementById('notif-banner').style.display = 'none';
-    scheduleAllReminders();
-    // Test notification
-    new Notification('¡Notificaciones activadas! 🎉', {
-      body: 'Te avisaremos cuando toque jugar.',
-      icon: 'icon-192.png'
-    });
+  try {
+    const OneSignal = await getOneSignal();
+    await OneSignal.Notifications.requestPermission();
+    await checkNotifPermission();
+  } catch(e) {
+    alert('No se pudo activar. Asegúrate de abrir la app desde el navegador la primera vez.');
   }
 }
 
-// ── Scheduling ──
-function scheduleAllReminders() {
-  notifTimers.forEach(t => clearTimeout(t));
-  notifTimers = [];
-  if (Notification.permission !== 'granted') return;
+// ── Scheduling via OneSignal ──
+async function scheduleAllReminders() {
+  if (!reminders.length) return;
+  try {
+    const OneSignal = await getOneSignal();
+    const opted = await OneSignal.User.PushSubscription.optedIn;
+    if (!opted) return;
 
-  reminders.forEach(r => {
-    if (!r.active) return;
-    const [hh, mm] = r.time.split(':').map(Number);
-    const now = new Date();
-    const today = now.getDay();
-
-    r.days.forEach(day => {
-      let diff = day - today;
-      if (diff < 0) diff += 7;
-
-      const target = new Date();
-      target.setHours(hh, mm, 0, 0);
-      target.setDate(target.getDate() + diff);
-      if (target <= now) target.setDate(target.getDate() + 7);
-
-      const ms = target - now;
-      const tid = setTimeout(() => {
-        new Notification(`⏰ Hora de jugar: ${r.game}`, {
-          body: '¡Tu reto diario te espera!',
-          icon: 'icon-192.png',
-          tag: 'reminder-' + r.id + '-' + day
-        });
-        // Reschedule for next week
-        scheduleAllReminders();
-      }, ms);
-      notifTimers.push(tid);
+    // Store reminders as OneSignal tags so the dashboard puede filtrarlos
+    // Las notificaciones se envían desde OneSignal Journeys/Automation
+    // Aquí guardamos los datos como tags del usuario
+    const tags = {};
+    reminders.forEach((r, i) => {
+      tags[`reminder_${i}_game`] = r.game;
+      tags[`reminder_${i}_time`] = r.time;
+      tags[`reminder_${i}_days`] = r.days.join(',');
     });
-  });
+    tags['reminder_count'] = reminders.length.toString();
+    await OneSignal.User.addTags(tags);
+
+    // Programar con setTimeout como respaldo cuando la app está abierta
+    notifTimers.forEach(t => clearTimeout(t));
+    notifTimers = [];
+    reminders.forEach(r => {
+      if (!r.active) return;
+      const [hh, mm] = r.time.split(':').map(Number);
+      const now = new Date();
+      const today = now.getDay();
+      r.days.forEach(day => {
+        let diff = day - today;
+        if (diff < 0) diff += 7;
+        const target = new Date();
+        target.setHours(hh, mm, 0, 0);
+        target.setDate(target.getDate() + diff);
+        if (target <= now) target.setDate(target.getDate() + 7);
+        const ms = target - now;
+        const tid = setTimeout(() => {
+          new Notification(`⏰ ${r.game}`, {
+            body: '¡Tu reto diario te espera!',
+            icon: 'icon-192.png'
+          });
+          scheduleAllReminders();
+        }, ms);
+        notifTimers.push(tid);
+      });
+    });
+  } catch(e) {
+    console.warn('OneSignal no disponible, usando fallback');
+  }
 }
 </script>
 </body>

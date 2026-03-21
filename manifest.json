@@ -1,8 +1,9 @@
 {
   "name": "Minijuegos Diarios",
   "short_name": "Minijuegos",
-  "description": "Tus minijuegos diarios de palabras y geografía",
-  "start_url": "/",
+  "description": "Tus minijuegos diarios de palabras, geografia, deportes, ciencia...",
+  "start_url": "/minijuegos-diarios/",
+  "scope": "/minijuegos-diarios/",
   "display": "standalone",
   "background_color": "#fafaf9",
   "theme_color": "#ffffff",

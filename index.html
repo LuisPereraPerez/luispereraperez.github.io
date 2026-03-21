@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Minijuegos">
+<title>Minijuegos Diarios</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e8e6e1;
+    --border-strong: #ccc9c0;
+    --text: #1a1916;
+    --text-muted: #767268;
+    --text-hint: #a8a49c;
+    --accent: #1a1916;
+    --accent-light: #f2f0eb;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110;
+      --surface: #1c1c1a;
+      --border: #2e2d29;
+      --border-strong: #3d3c37;
+      --text: #f0ede8;
+      --text-muted: #8a8680;
+      --text-hint: #5a5852;
+      --accent: #f0ede8;
+      --accent-light: #242320;
+    }
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── App shell ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-top: var(--safe-top);
+  }
+
+  /* ── Views ── */
+  .view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .view.active { display: flex; }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 10px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    letter-spacing: -0.3px;
+  }
+  .header-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  .header-btn {
+    background: none;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .header-btn:active { background: var(--accent-light); }
+
+  /* ── Game grid ── */
+  .game-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + var(--safe-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-hint);
+    padding: 0 4px;
+    margin: 0 0 10px;
+  }
+
+  .game-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .game-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 14px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+  }
+  .game-card:active { transform: scale(0.97); background: var(--accent-light); }
+
+  .game-icon {
+    font-size: 26px;
+    margin-bottom: 10px;
+    display: block;
+    line-height: 1;
+  }
+  .game-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 3px;
+  }
+  .game-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+  .game-card.done::after {
+    content: '';
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #4caf73;
+  }
+  .game-card.featured {
+    grid-column: span 2;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px;
+  }
+  .game-card.featured .game-icon { font-size: 32px; margin: 0; flex-shrink: 0; }
+  .game-card.featured .game-text { flex: 1; }
+
+  /* ── Bottom nav ── */
+  .bottom-nav {
+    display: flex;
+    border-top: 0.5px solid var(--border);
+    background: var(--bg);
+    padding-bottom: var(--safe-bottom);
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 8px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s;
+  }
+  .nav-item:active { background: var(--accent-light); }
+  .nav-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-icon svg { width: 20px; height: 20px; stroke: var(--text-muted); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+  .nav-item.active .nav-icon svg { stroke: var(--text); }
+  .nav-item.active .nav-label { color: var(--text); font-weight: 500; }
+
+  /* ── Iframe view ── */
+  #game-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+  }
+  #game-view.active { display: flex; }
+
+  .game-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .back-btn {
+    width: 32px; height: 32px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .back-btn svg { width: 16px; height: 16px; stroke: var(--text); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .back-btn:active { background: var(--accent-light); }
+  .game-bar-info { flex: 1; }
+  .game-bar-name { font-size: 14px; font-weight: 500; }
+  .game-bar-url { font-size: 11px; color: var(--text-hint); }
+  .open-btn {
+    font-size: 12px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .open-btn:active { background: var(--accent-light); }
+
+  #game-iframe {
+    flex: 1;
+    border: none;
+    width: 100%;
+    background: white;
+  }
+
+  .iframe-blocked {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+  .iframe-blocked .big-icon { font-size: 40px; }
+  .iframe-blocked h3 { font-size: 17px; font-weight: 500; }
+  .iframe-blocked p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+  .open-external {
+    margin-top: 8px;
+    padding: 12px 24px;
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* ── Reminders view ── */
+  .reminders-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px calc(20px + var(--safe-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .reminder-form {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  .form-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .form-group { margin-bottom: 14px; }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+  .form-select, .form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+  }
+  .form-select:focus, .form-input:focus {
+    border-color: var(--text-hint);
+  }
+  .select-wrapper { position: relative; }
+  .select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--text-muted);
+    pointer-events: none;
+  }
+  .time-row { display: flex; gap: 8px; }
+  .time-row .form-group { flex: 1; }
+  .days-grid {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .day-chip {
+    padding: 5px 11px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    background: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .day-chip.sel {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+
+  .add-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .add-btn:active { opacity: 0.75; }
+
+  .notif-banner {
+    background: #fff8e6;
+    border: 0.5px solid #e8d48a;
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #6b5a1c;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .notif-banner { background: #2a2208; border-color: #4a3c10; color: #c9a83a; }
+  }
+  .notif-banner button {
+    margin-top: 6px;
+    display: block;
+    background: none;
+    border: 0.5px solid currentColor;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: inherit;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .reminder-list { display: flex; flex-direction: column; gap: 8px; }
+  .reminder-item {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .reminder-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #4caf73;
+    flex-shrink: 0;
+  }
+  .reminder-dot.inactive { background: var(--border-strong); }
+  .reminder-info { flex: 1; }
+  .reminder-name { font-size: 14px; font-weight: 500; }
+  .reminder-time { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .reminder-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--text-hint);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .reminder-del:active { color: #e24b4a; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-hint);
+    font-size: 14px;
+  }
+
+  /* ── Settings view ── */
+  .settings-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px calc(20px + var(--safe-bottom));
+  }
+  .settings-section { margin-bottom: 24px; }
+  .settings-row {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .settings-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 0.5px solid var(--border);
+    gap: 12px;
+  }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-icon { font-size: 16px; width: 22px; text-align: center; }
+  .settings-label { flex: 1; font-size: 14px; }
+  .settings-value { font-size: 13px; color: var(--text-muted); }
+  .install-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+  .install-card h3 { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  .install-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .install-steps { margin-top: 12px; counter-reset: step; }
+  .install-step {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══ HOME VIEW ═══ -->
+  <div id="home-view" class="view active">
+    <div class="header">
+      <div>
+        <div class="header-title">Minijuegos</div>
+        <div class="header-sub" id="date-label"></div>
+      </div>
+    </div>
+
+    <div class="game-scroll">
+      <div class="section-label">Palabras</div>
+      <div class="game-grid">
+        <div class="game-card featured" data-url="https://lapalabradeldia.com/" data-name="La Palabra del Día">
+          <span class="game-icon">🟩</span>
+          <div class="game-text">
+            <div class="game-name">La Palabra del Día</div>
+            <div class="game-desc">Wordle en español</div>
+          </div>
+        </div>
+        <div class="game-card featured" data-url="https://wordle-canario.vercel.app/" data-name="Wordle Canario">
+          <span class="game-icon">🌋</span>
+          <div class="game-text">
+            <div class="game-name">Wordle Canario</div>
+            <div class="game-desc">Palabras del archipiélago</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Geografía y banderas</div>
+      <div class="game-grid">
+        <div class="game-card" data-url="https://www.flagle.io/" data-name="Flagle">
+          <span class="game-icon">🏳</span>
+          <div class="game-name">Flagle</div>
+          <div class="game-desc">Adivina la bandera</div>
+        </div>
+        <div class="game-card" data-url="https://flagle-game.com/daily" data-name="Flagle Game">
+          <span class="game-icon">🚩</span>
+          <div class="game-name">Flagle Game</div>
+          <div class="game-desc">Banderas diarias</div>
+        </div>
+        <div class="game-card" data-url="https://worldle.teuteuf.fr/" data-name="Worldle">
+          <span class="game-icon">🌍</span>
+          <div class="game-name">Worldle</div>
+          <div class="game-desc">Silueta del país</div>
+        </div>
+        <div class="game-card" data-url="https://travle.earth/" data-name="Travle">
+          <span class="game-icon">✈️</span>
+          <div class="game-name">Travle</div>
+          <div class="game-desc">Ruta entre países</div>
+        </div>
+      </div>
+
+      <div class="section-label">Deportes</div>
+      <div class="game-grid">
+        <div class="game-card featured" data-url="https://futbol-11.com/" data-name="Fútbol 11">
+          <span class="game-icon">⚽</span>
+          <div class="game-text">
+            <div class="game-name">Fútbol 11</div>
+            <div class="game-desc">Adivina el once de fútbol</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Videojuegos</div>
+      <div class="game-grid">
+        <div class="game-card featured" data-url="https://www.mcdle.net/" data-name="Mcdle">
+          <span class="game-icon">⛏️</span>
+          <div class="game-text">
+            <div class="game-name">Mcdle</div>
+            <div class="game-desc">Adivina el bloque de Minecraft</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Ciencias</div>
+      <div class="game-grid">
+        <div class="game-card featured" data-url="https://metazooa.com/play/game" data-name="Metazooa">
+          <span class="game-icon">🦎</span>
+          <div class="game-text">
+            <div class="game-name">Metazooa</div>
+            <div class="game-desc">Adivina el animal por su árbol evolutivo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item active" onclick="showView('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <span class="nav-label">Juegos</span>
+      </button>
+      <button class="nav-item" onclick="showView('reminders')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <span class="nav-label">Avisos</span>
+      </button>
+      <button class="nav-item" onclick="showView('settings')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <span class="nav-label">Ajustes</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ GAME VIEW (iframe) ═══ -->
+  <div id="game-view" class="view">
+    <div class="game-bar">
+      <button class="back-btn" onclick="closeGame()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="game-bar-info">
+        <div class="game-bar-name" id="game-bar-name">Juego</div>
+        <div class="game-bar-url" id="game-bar-url"></div>
+      </div>
+      <button class="open-btn" id="open-external-top" onclick="openCurrentGame()">Abrir ↗</button>
+    </div>
+    <iframe id="game-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-top-navigation" allow="fullscreen"></iframe>
+    <div class="iframe-blocked" id="iframe-blocked" style="display:none;">
+      <div class="big-icon">🔒</div>
+      <h3>Este juego no permite incrustarse</h3>
+      <p>Algunos sitios bloquean su carga dentro de otras apps. Puedes abrirlo en tu navegador con el botón de abajo.</p>
+      <button class="open-external" onclick="openCurrentGame()">Abrir en el navegador ↗</button>
+    </div>
+  </div>
+
+  <!-- ═══ REMINDERS VIEW ═══ -->
+  <div id="reminders-view" class="view">
+    <div class="header">
+      <div>
+        <div class="header-title">Avisos</div>
+        <div class="header-sub">Recordatorios diarios</div>
+      </div>
+    </div>
+
+    <div class="reminders-scroll">
+      <div id="notif-banner" class="notif-banner" style="display:none;">
+        <div>
+          <div>Las notificaciones están desactivadas.</div>
+          <button onclick="requestNotifPermission()">Activar notificaciones</button>
+        </div>
+      </div>
+
+      <div class="reminder-form">
+        <div class="form-title">Nuevo recordatorio</div>
+
+        <div class="form-group">
+          <label class="form-label">Juego</label>
+          <div class="select-wrapper">
+            <select class="form-select" id="r-game">
+              <optgroup label="Palabras">
+                <option value="La Palabra del Día">🟩 La Palabra del Día</option>
+                <option value="Wordle Canario">🌋 Wordle Canario</option>
+              </optgroup>
+              <optgroup label="Geografía y banderas">
+                <option value="Flagle">🏳 Flagle</option>
+                <option value="Flagle Game">🚩 Flagle Game</option>
+                <option value="Worldle">🌍 Worldle</option>
+                <option value="Travle">✈️ Travle</option>
+              </optgroup>
+              <optgroup label="Deportes">
+                <option value="Fútbol 11">⚽ Fútbol 11</option>
+              </optgroup>
+              <optgroup label="Videojuegos">
+                <option value="Mcdle">⛏️ Mcdle</option>
+              </optgroup>
+              <optgroup label="Ciencias">
+                <option value="Metazooa">🦎 Metazooa</option>
+              </optgroup>
+              <option value="Todos los juegos">🎮 Todos los juegos</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="time-row">
+          <div class="form-group">
+            <label class="form-label">Hora</label>
+            <input type="time" class="form-input" id="r-time" value="09:00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Días</label>
+          <div class="days-grid" id="days-grid">
+            <button class="day-chip sel" data-day="1">L</button>
+            <button class="day-chip sel" data-day="2">M</button>
+            <button class="day-chip sel" data-day="3">X</button>
+            <button class="day-chip sel" data-day="4">J</button>
+            <button class="day-chip sel" data-day="5">V</button>
+            <button class="day-chip" data-day="6">S</button>
+            <button class="day-chip" data-day="0">D</button>
+          </div>
+        </div>
+
+        <button class="add-btn" onclick="addReminder()">Añadir recordatorio</button>
+      </div>
+
+      <div class="section-label">Recordatorios activos</div>
+      <div class="reminder-list" id="reminder-list">
+        <div class="empty-state">Aún no tienes recordatorios</div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item" onclick="showView('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <span class="nav-label">Juegos</span>
+      </button>
+      <button class="nav-item active" onclick="showView('reminders')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <span class="nav-label">Avisos</span>
+      </button>
+      <button class="nav-item" onclick="showView('settings')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <span class="nav-label">Ajustes</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS VIEW ═══ -->
+  <div id="settings-view" class="view">
+    <div class="header">
+      <div>
+        <div class="header-title">Ajustes</div>
+        <div class="header-sub">App y notificaciones</div>
+      </div>
+    </div>
+
+    <div class="settings-scroll">
+      <div class="settings-section">
+        <div class="section-label" style="padding:0 0 10px;">Instalar como app</div>
+        <div class="install-card">
+          <h3>📱 Android (Chrome)</h3>
+          <div class="install-steps">
+            <div class="install-step"><div class="step-num">1</div><span>Abre esta página en Chrome</span></div>
+            <div class="install-step"><div class="step-num">2</div><span>Pulsa los tres puntos ⋮ arriba a la derecha</span></div>
+            <div class="install-step"><div class="step-num">3</div><span>Selecciona "Añadir a pantalla de inicio"</span></div>
+          </div>
+        </div>
+        <div class="install-card">
+          <h3>🍎 iPhone / iPad (Safari)</h3>
+          <div class="install-steps">
+            <div class="install-step"><div class="step-num">1</div><span>Abre esta página en Safari</span></div>
+            <div class="install-step"><div class="step-num">2</div><span>Pulsa el botón compartir  ⎙</span></div>
+            <div class="install-step"><div class="step-num">3</div><span>Selecciona "Añadir a pantalla de inicio"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-label" style="padding:0 0 10px;">Notificaciones</div>
+        <div class="settings-row">
+          <div class="settings-item">
+            <span class="settings-icon">🔔</span>
+            <span class="settings-label">Estado</span>
+            <span class="settings-value" id="notif-status">Comprobando...</span>
+          </div>
+          <div class="settings-item" style="cursor:pointer;" onclick="requestNotifPermission()">
+            <span class="settings-icon">✓</span>
+            <span class="settings-label">Activar notificaciones</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-label" style="padding:0 0 10px;">Acerca de</div>
+        <div class="settings-row">
+          <div class="settings-item">
+            <span class="settings-icon">ℹ️</span>
+            <span class="settings-label">Versión</span>
+            <span class="settings-value">1.0.0</span>
+          </div>
+          <div class="settings-item">
+            <span class="settings-icon">🎮</span>
+            <span class="settings-label">Juegos disponibles</span>
+            <span class="settings-value">8</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item" onclick="showView('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <span class="nav-label">Juegos</span>
+      </button>
+      <button class="nav-item" onclick="showView('reminders')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <span class="nav-label">Avisos</span>
+      </button>
+      <button class="nav-item active" onclick="showView('settings')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <span class="nav-label">Ajustes</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──
+let currentView = 'home';
+let currentGameUrl = '';
+let reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+let notifTimers = [];
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  setDateLabel();
+  setupGameCards();
+  setupDayChips();
+  renderReminders();
+  checkNotifPermission();
+  scheduleAllReminders();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+});
+
+function setDateLabel() {
+  const d = new Date();
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  document.getElementById('date-label').textContent =
+    d.toLocaleDateString('es-ES', opts);
+}
+
+// ── Navigation ──
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(name + '-view').classList.add('active');
+  currentView = name;
+  document.getElementById('game-view').classList.remove('active');
+}
+
+// ── Game cards ──
+function setupGameCards() {
+  document.querySelectorAll('.game-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const url = card.dataset.url;
+      const name = card.dataset.name;
+      openGame(url, name);
+    });
+  });
+}
+
+function openGame(url, name) {
+  currentGameUrl = url;
+  document.getElementById('game-bar-name').textContent = name;
+  document.getElementById('game-bar-url').textContent = new URL(url).hostname;
+  document.getElementById('game-iframe').src = url;
+  document.getElementById('iframe-blocked').style.display = 'none';
+  document.getElementById('game-iframe').style.display = 'block';
+
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('game-view').classList.add('active');
+
+  // Detect iframe block
+  const iframe = document.getElementById('game-iframe');
+  iframe.onerror = showIframeBlocked;
+  const timer = setTimeout(showIframeBlocked, 5000);
+  iframe.onload = () => {
+    clearTimeout(timer);
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      if (!doc || doc.body.innerHTML === '') showIframeBlocked();
+    } catch(e) {
+      // Cross-origin but loaded — probably fine
+      clearTimeout(timer);
+    }
+  };
+}
+
+function showIframeBlocked() {
+  document.getElementById('game-iframe').style.display = 'none';
+  document.getElementById('iframe-blocked').style.display = 'flex';
+}
+
+function closeGame() {
+  document.getElementById('game-iframe').src = '';
+  showView('home');
+}
+
+function openCurrentGame() {
+  if (currentGameUrl) window.open(currentGameUrl, '_blank');
+}
+
+// ── Day chips ──
+function setupDayChips() {
+  document.querySelectorAll('#days-grid .day-chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('sel'));
+  });
+}
+
+function getSelectedDays() {
+  return Array.from(document.querySelectorAll('#days-grid .day-chip.sel'))
+    .map(c => parseInt(c.dataset.day));
+}
+
+// ── Reminders ──
+function addReminder() {
+  const game = document.getElementById('r-game').value;
+  const time = document.getElementById('r-time').value;
+  const days = getSelectedDays();
+
+  if (!time) { alert('Selecciona una hora'); return; }
+  if (days.length === 0) { alert('Selecciona al menos un día'); return; }
+
+  const reminder = {
+    id: Date.now(),
+    game,
+    time,
+    days,
+    active: true
+  };
+
+  reminders.push(reminder);
+  saveReminders();
+  renderReminders();
+  scheduleAllReminders();
+}
+
+function deleteReminder(id) {
+  reminders = reminders.filter(r => r.id !== id);
+  saveReminders();
+  renderReminders();
+  scheduleAllReminders();
+}
+
+function saveReminders() {
+  localStorage.setItem('reminders', JSON.stringify(reminders));
+}
+
+function renderReminders() {
+  const list = document.getElementById('reminder-list');
+  if (reminders.length === 0) {
+    list.innerHTML = '<div class="empty-state">Aún no tienes recordatorios</div>';
+    return;
+  }
+  const dayNames = ['D','L','M','X','J','V','S'];
+  list.innerHTML = reminders.map(r => `
+    <div class="reminder-item">
+      <div class="reminder-dot ${r.active ? '' : 'inactive'}"></div>
+      <div class="reminder-info">
+        <div class="reminder-name">${r.game}</div>
+        <div class="reminder-time">${r.time} · ${r.days.map(d => dayNames[d]).join(' ')}</div>
+      </div>
+      <button class="reminder-del" onclick="deleteReminder(${r.id})">×</button>
+    </div>
+  `).join('');
+}
+
+// ── Notifications ──
+function checkNotifPermission() {
+  if (!('Notification' in window)) {
+    document.getElementById('notif-status').textContent = 'No soportado';
+    return;
+  }
+  const perm = Notification.permission;
+  document.getElementById('notif-status').textContent =
+    perm === 'granted' ? 'Activadas' :
+    perm === 'denied' ? 'Bloqueadas' : 'No activadas';
+
+  if (perm !== 'granted') {
+    document.getElementById('notif-banner').style.display = 'flex';
+  }
+}
+
+async function requestNotifPermission() {
+  if (!('Notification' in window)) { alert('Tu navegador no soporta notificaciones'); return; }
+  const perm = await Notification.requestPermission();
+  checkNotifPermission();
+  if (perm === 'granted') {
+    document.getElementById('notif-banner').style.display = 'none';
+    scheduleAllReminders();
+    // Test notification
+    new Notification('¡Notificaciones activadas! 🎉', {
+      body: 'Te avisaremos cuando toque jugar.',
+      icon: 'icon-192.png'
+    });
+  }
+}
+
+// ── Scheduling ──
+function scheduleAllReminders() {
+  notifTimers.forEach(t => clearTimeout(t));
+  notifTimers = [];
+  if (Notification.permission !== 'granted') return;
+
+  reminders.forEach(r => {
+    if (!r.active) return;
+    const [hh, mm] = r.time.split(':').map(Number);
+    const now = new Date();
+    const today = now.getDay();
+
+    r.days.forEach(day => {
+      let diff = day - today;
+      if (diff < 0) diff += 7;
+
+      const target = new Date();
+      target.setHours(hh, mm, 0, 0);
+      target.setDate(target.getDate() + diff);
+      if (target <= now) target.setDate(target.getDate() + 7);
+
+      const ms = target - now;
+      const tid = setTimeout(() => {
+        new Notification(`⏰ Hora de jugar: ${r.game}`, {
+          body: '¡Tu reto diario te espera!',
+          icon: 'icon-192.png',
+          tag: 'reminder-' + r.id + '-' + day
+        });
+        // Reschedule for next week
+        scheduleAllReminders();
+      }, ms);
+      notifTimers.push(tid);
+    });
+  });
+}
+</script>
+</body>
+</html>

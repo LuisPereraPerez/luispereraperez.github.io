@@ -1,4 +1,4 @@
-const CACHE = 'minijuegos-v1';
+const CACHE = 'minijuegos-v2';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {

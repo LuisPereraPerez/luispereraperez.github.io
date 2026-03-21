@@ -814,12 +814,17 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-// ── State ──
+const SUPABASE_URL = 'https://ozsoodngnbrnsjhmatkr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_bVqzWN5DqtIfxheqN_iKMQ_L3NwRcga';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let currentView = 'home';
 let currentGameUrl = '';
 let reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
 let notifTimers = [];
+let onesignalUserId = null;
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
@@ -915,7 +920,7 @@ function getSelectedDays() {
 }
 
 // ── Reminders ──
-function addReminder() {
+async function addReminder() {
   const game = document.getElementById('r-game').value;
   const time = document.getElementById('r-time').value;
   const days = getSelectedDays();
@@ -923,25 +928,48 @@ function addReminder() {
   if (!time) { alert('Selecciona una hora'); return; }
   if (days.length === 0) { alert('Selecciona al menos un día'); return; }
 
-  const reminder = {
-    id: Date.now(),
-    game,
-    time,
-    days,
-    active: true
-  };
-
+  const reminder = { id: Date.now(), game, time, days, active: true };
   reminders.push(reminder);
   saveReminders();
   renderReminders();
-  scheduleAllReminders();
+
+  // Guardar en Supabase si tenemos el ID de OneSignal
+  try {
+    const OneSignal = await getOneSignal();
+    const uid = await OneSignal.User.PushSubscription.id;
+    if (uid) {
+      await db.from('reminders').insert({
+        onesignal_id: uid,
+        game,
+        time,
+        days: days.join(',')
+      });
+    }
+  } catch(e) {
+    console.warn('No se pudo guardar en servidor:', e);
+  }
 }
 
-function deleteReminder(id) {
-  reminders = reminders.filter(r => r.id !== id);
+async function deleteReminder(id) {
+  const r = reminders.find(x => x.id === id);
+  reminders = reminders.filter(x => x.id !== id);
   saveReminders();
   renderReminders();
-  scheduleAllReminders();
+
+  // Borrar de Supabase
+  if (r) {
+    try {
+      const OneSignal = await getOneSignal();
+      const uid = await OneSignal.User.PushSubscription.id;
+      if (uid) {
+        await db.from('reminders')
+          .delete()
+          .eq('onesignal_id', uid)
+          .eq('game', r.game)
+          .eq('time', r.time);
+      }
+    } catch(e) {}
+  }
 }
 
 function saveReminders() {

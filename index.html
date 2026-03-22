@@ -512,6 +512,47 @@
     flex-shrink: 0;
     margin-top: 1px;
   }
+
+  body.force-light {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e8e6e1;
+    --border-strong: #ccc9c0;
+    --text: #1a1916;
+    --text-muted: #767268;
+    --text-hint: #a8a49c;
+    --accent: #1a1916;
+    --accent-light: #f2f0eb;
+  }
+  body.force-dark {
+    --bg: #111110;
+    --surface: #1c1c1a;
+    --border: #2e2d29;
+    --border-strong: #3d3c37;
+    --text: #f0ede8;
+    --text-muted: #8a8680;
+    --text-hint: #5a5852;
+    --accent: #f0ede8;
+    --accent-light: #242320;
+  }
+
+  .theme-btn {
+    flex: 1;
+    padding: 8px 4px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .theme-btn.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
 </style>
 </head>
 <body>
@@ -781,6 +822,20 @@
             <div class="install-step"><div class="step-num">1</div><span>Abre esta página en Safari</span></div>
             <div class="install-step"><div class="step-num">2</div><span>Pulsa el botón compartir  ⎙</span></div>
             <div class="install-step"><div class="step-num">3</div><span>Selecciona "Añadir a pantalla de inicio"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-label" style="padding:0 0 10px;">Ajustes</div>
+        <div class="settings-row">
+          <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+            <span class="settings-label">🌓 Tema</span>
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <button onclick="setTheme('auto')" id="theme-auto" class="theme-btn">Automático</button>
+              <button onclick="setTheme('light')" id="theme-light" class="theme-btn">☀️ Claro</button>
+              <button onclick="setTheme('dark')" id="theme-dark" class="theme-btn">🌙 Oscuro</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1114,6 +1169,28 @@ async function scheduleAllReminders() {
     console.warn('OneSignal no disponible, usando fallback');
   }
 }
+
+// ── Theme ──
+const themes = ['auto', 'light', 'dark'];
+const themeLabels = { auto: 'Automático', light: 'Claro', dark: 'Oscuro' };
+let currentTheme = localStorage.getItem('theme') || 'auto';
+
+function applyTheme() {
+  document.body.classList.remove('force-light', 'force-dark');
+  if (currentTheme === 'light') document.body.classList.add('force-light');
+  if (currentTheme === 'dark') document.body.classList.add('force-dark');
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  const active = document.getElementById('theme-' + currentTheme);
+  if (active) active.classList.add('active');
+}
+
+function setTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem('theme', currentTheme);
+  applyTheme();
+}
+
+applyTheme();
 </script>
 </body>
 </html>

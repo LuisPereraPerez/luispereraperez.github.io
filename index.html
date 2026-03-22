@@ -553,6 +553,79 @@
     color: var(--bg);
     border-color: var(--text);
   }
+
+  .completed-badge {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #4caf73;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    color: white;
+  }
+
+  .completion-popup {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 0.5px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px calc(24px + var(--safe-bottom));
+    z-index: 999;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .completion-popup.show { transform: translateY(0); }
+  .completion-popup h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .completion-popup p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+  .completion-btns {
+    display: flex;
+    gap: 10px;
+  }
+  .completion-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-strong);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    background: none;
+    color: var(--text);
+  }
+  .completion-btn.yes {
+    background: #4caf73;
+    border-color: #4caf73;
+    color: white;
+  }
+  .completion-btn:active { opacity: 0.75; }
+
+  .streak-badge {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: #ff6b2b;
+    color: white;
+    border-radius: 20px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .streak-badge.with-completion {
+    right: 36px;
+  }
 </style>
 </head>
 <body>
@@ -898,6 +971,14 @@
     </div>
   </div>
 
+  <div class="completion-popup" id="completion-popup">
+    <h3 id="completion-title">¿Completaste el juego?</h3>
+    <p>Si lo terminaste, márcalo para llevar el control del día</p>
+    <div class="completion-btns">
+      <button class="completion-btn" onclick="answerCompletion(false)">No lo terminé</button>
+      <button class="completion-btn yes" onclick="answerCompletion(true)">✓ Sí, completado</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -920,6 +1001,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderReminders();
   checkNotifPermission();
   scheduleAllReminders();
+  renderCompletions();  // primero completions
+  renderStreaks();      // luego streaks
+  scheduleCompletionReset();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -953,6 +1037,7 @@ function setupGameCards() {
 }
 
 function openGame(url, name) {
+  startCompletionTimer(name);
   currentGameUrl = url;
   document.getElementById('game-bar-name').textContent = name;
   document.getElementById('game-bar-url').textContent = new URL(url).hostname;
@@ -985,6 +1070,7 @@ function showIframeBlocked() {
 }
 
 function closeGame() {
+  stopCompletionTimer();
   document.getElementById('game-iframe').src = '';
   showView('home');
 }
@@ -1191,6 +1277,147 @@ function setTheme(theme) {
 }
 
 applyTheme();
+
+
+// ── Completion tracking ──
+let completionTimer = null;
+let currentGameForCompletion = null;
+let gameStartTime = null;
+
+function loadCompletions() {
+  const saved = localStorage.getItem('completions');
+  const savedDate = localStorage.getItem('completions_date');
+  const today = new Date().toDateString();
+  if (savedDate !== today) {
+    localStorage.removeItem('completions');
+    localStorage.setItem('completions_date', today);
+    return {};
+  }
+  return saved ? JSON.parse(saved) : {};
+}
+
+function saveCompletion(gameName, completed) {
+  const completions = loadCompletions();
+  completions[gameName] = completed;
+  localStorage.setItem('completions', JSON.stringify(completions));
+  renderCompletions();
+}
+
+function renderCompletions() {
+  const completions = loadCompletions();
+  document.querySelectorAll('.game-card').forEach(card => {
+    const name = card.dataset.name;
+    const existing = card.querySelector('.completed-badge');
+    if (existing) existing.remove();
+    if (completions[name] === true) {
+      const badge = document.createElement('div');
+      badge.className = 'completed-badge';
+      badge.textContent = '✓';
+      card.appendChild(badge);
+    }
+  });
+}
+
+function startCompletionTimer(gameName) {
+  currentGameForCompletion = gameName;
+  gameStartTime = Date.now();
+  if (completionTimer) clearTimeout(completionTimer);
+  completionTimer = setTimeout(() => {
+    // Marcar que está listo para preguntar al salir
+  }, 30000);
+}
+
+function stopCompletionTimer() {
+  const elapsed = Date.now() - (gameStartTime || 0);
+  const gameName = currentGameForCompletion;
+  if (completionTimer) clearTimeout(completionTimer);
+  completionTimer = null;
+  currentGameForCompletion = null;
+  gameStartTime = null;
+
+  if (!gameName) return;
+
+  const completions = loadCompletions();
+  if (gameName in completions) return; // ya respondió antes
+
+  if (elapsed >= 30000) {
+    showCompletionPopup(gameName);
+  }
+}
+
+function showCompletionPopup(gameName) {
+  document.getElementById('completion-title').textContent =
+    `¿Completaste ${gameName}?`;
+  document.getElementById('completion-popup').dataset.game = gameName;
+  document.getElementById('completion-popup').classList.add('show');
+}
+
+function answerCompletion(completed) {
+  const gameName = document.getElementById('completion-popup').dataset.game;
+  document.getElementById('completion-popup').classList.remove('show');
+  if (gameName) saveCompletion(gameName, completed);
+  if (completed) updateStreak(gameName);
+}
+
+// Medianoche reset
+function scheduleCompletionReset() {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  const ms = midnight - now;
+  setTimeout(() => {
+    localStorage.removeItem('completions');
+    localStorage.removeItem('completions_date');
+    renderCompletions();
+    scheduleCompletionReset();
+  }, ms);
+}
+scheduleCompletionReset();
+
+// ── Streaks ──
+function loadStreaks() {
+  return JSON.parse(localStorage.getItem('streaks') || '{}');
+}
+
+function updateStreak(gameName) {
+  const streaks = loadStreaks();
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  const s = streaks[gameName] || { count: 0, lastDay: null };
+
+  if (s.lastDay === today) return; // ya contó hoy
+  if (s.lastDay === yesterday) {
+    s.count += 1; // día consecutivo
+  } else {
+    s.count = 1; // racha rota, empieza de nuevo
+  }
+  s.lastDay = today;
+  streaks[gameName] = s;
+  localStorage.setItem('streaks', JSON.stringify(streaks));
+  renderStreaks();
+}
+
+function renderStreaks() {
+  const streaks = loadStreaks();
+  const completions = loadCompletions();
+
+  document.querySelectorAll('.game-card').forEach(card => {
+    const name = card.dataset.name;
+    const existing = card.querySelector('.streak-badge');
+    if (existing) existing.remove();
+
+    const s = streaks[name];
+    if (s && s.count > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'streak-badge';
+      // Si hay tick de completado, desplaza la racha a la izquierda
+      if (completions[name] === true) badge.classList.add('with-completion');
+      badge.innerHTML = `🔥 ${s.count}`;
+      card.appendChild(badge);
+    }
+  });
+}
 </script>
 </body>
 </html>

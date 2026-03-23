@@ -1376,7 +1376,7 @@ async function updateStreak(gameName) {
       .select('id')
       .eq('onesignal_id', uid)
       .eq('game', gameName)
-      .single();
+      .maybeSingle();
     if (data) {
       await db.from('streaks').update({
         count: newCount,

@@ -995,7 +995,6 @@ let reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
 let notifTimers = [];
 let onesignalUserId = null;
 
-// ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
   setDateLabel();
   setupGameCards();
@@ -1018,7 +1017,6 @@ function setDateLabel() {
     d.toLocaleDateString('es-ES', opts);
 }
 
-// ── Navigation ──
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(name + '-view').classList.add('active');
@@ -1026,7 +1024,6 @@ function showView(name) {
   document.getElementById('game-view').classList.remove('active');
 }
 
-// ── Game cards ──
 function setupGameCards() {
   document.querySelectorAll('.game-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -1076,7 +1073,6 @@ function openCurrentGame() {
   if (currentGameUrl) window.open(currentGameUrl, '_blank');
 }
 
-// ── Day chips ──
 function setupDayChips() {
   document.querySelectorAll('#days-grid .day-chip').forEach(chip => {
     chip.addEventListener('click', () => chip.classList.toggle('sel'));
@@ -1088,7 +1084,6 @@ function getSelectedDays() {
     .map(c => parseInt(c.dataset.day));
 }
 
-// ── Reminders ──
 async function addReminder() {
   const game = document.getElementById('r-game').value;
   const time = document.getElementById('r-time').value;
@@ -1158,7 +1153,6 @@ function renderReminders() {
   `).join('');
 }
 
-// ── Notifications (OneSignal) ──
 async function checkNotifPermission() {
   const statusEl = document.getElementById('notif-status');
   const banner = document.getElementById('notif-banner');
@@ -1196,7 +1190,6 @@ async function requestNotifPermission() {
   }
 }
 
-// ── Scheduling ──
 async function scheduleAllReminders() {
   if (!reminders.length) return;
   try {
@@ -1241,7 +1234,6 @@ async function scheduleAllReminders() {
   }
 }
 
-// ── Theme ──
 const themes = ['auto', 'light', 'dark'];
 let currentTheme = localStorage.getItem('theme') || 'auto';
 
@@ -1262,7 +1254,6 @@ function setTheme(theme) {
 
 applyTheme();
 
-// ── Completion tracking ──
 let completionTimer = null;
 let currentGameForCompletion = null;
 let gameStartTime = null;
@@ -1327,11 +1318,11 @@ function showCompletionPopup(gameName) {
   document.getElementById('completion-popup').classList.add('show');
 }
 
-function answerCompletion(completed) {
+async function answerCompletion(completed) {
   const gameName = document.getElementById('completion-popup').dataset.game;
   document.getElementById('completion-popup').classList.remove('show');
   if (gameName) saveCompletion(gameName, completed);
-  if (completed) updateStreak(gameName);
+  if (completed) await updateStreak(gameName);
 }
 
 function scheduleCompletionReset() {
@@ -1349,7 +1340,6 @@ function scheduleCompletionReset() {
 
 scheduleCompletionReset();
 
-// ── Streaks ──
 async function getOnesignalId() {
   try {
     const OneSignal = await getOneSignal();

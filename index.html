@@ -989,7 +989,6 @@
 const SUPABASE_URL = 'https://ozsoodngnbrnsjhmatkr.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_bVqzWN5DqtIfxheqN_iKMQ_L3NwRcga';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 let currentView = 'home';
 let currentGameUrl = '';
 let reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
@@ -1007,7 +1006,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCompletions();
   await renderStreaks();
   scheduleCompletionReset();
-
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
@@ -1047,11 +1045,8 @@ function openGame(url, name) {
   document.getElementById('game-iframe').src = url;
   document.getElementById('iframe-blocked').style.display = 'none';
   document.getElementById('game-iframe').style.display = 'block';
-
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('game-view').classList.add('active');
-
-  // Detect iframe block
   const iframe = document.getElementById('game-iframe');
   iframe.onerror = showIframeBlocked;
   const timer = setTimeout(showIframeBlocked, 5000);
@@ -1061,7 +1056,6 @@ function openGame(url, name) {
       const doc = iframe.contentDocument || iframe.contentWindow.document;
       if (!doc || doc.body.innerHTML === '') showIframeBlocked();
     } catch(e) {
-      // Cross-origin but loaded — probably fine
       clearTimeout(timer);
     }
   };
@@ -1099,16 +1093,12 @@ async function addReminder() {
   const game = document.getElementById('r-game').value;
   const time = document.getElementById('r-time').value;
   const days = getSelectedDays();
-
   if (!time) { alert('Selecciona una hora'); return; }
   if (days.length === 0) { alert('Selecciona al menos un día'); return; }
-
   const reminder = { id: Date.now(), game, time, days, active: true };
   reminders.push(reminder);
   saveReminders();
   renderReminders();
-
-  // Guardar en Supabase si tenemos el ID de OneSignal
   try {
     const OneSignal = await getOneSignal();
     const uid = await OneSignal.User.PushSubscription.id;
@@ -1130,8 +1120,6 @@ async function deleteReminder(id) {
   reminders = reminders.filter(x => x.id !== id);
   saveReminders();
   renderReminders();
-
-  // Borrar de Supabase
   if (r) {
     try {
       const OneSignal = await getOneSignal();
@@ -1208,17 +1196,13 @@ async function requestNotifPermission() {
   }
 }
 
-// ── Scheduling via OneSignal ──
+// ── Scheduling ──
 async function scheduleAllReminders() {
   if (!reminders.length) return;
   try {
     const OneSignal = await getOneSignal();
     const opted = await OneSignal.User.PushSubscription.optedIn;
     if (!opted) return;
-
-    // Store reminders as OneSignal tags so the dashboard puede filtrarlos
-    // Las notificaciones se envían desde OneSignal Journeys/Automation
-    // Aquí guardamos los datos como tags del usuario
     const tags = {};
     reminders.forEach((r, i) => {
       tags[`reminder_${i}_game`] = r.game;
@@ -1227,8 +1211,6 @@ async function scheduleAllReminders() {
     });
     tags['reminder_count'] = reminders.length.toString();
     await OneSignal.User.addTags(tags);
-
-    // Programar con setTimeout como respaldo cuando la app está abierta
     notifTimers.forEach(t => clearTimeout(t));
     notifTimers = [];
     reminders.forEach(r => {
@@ -1255,13 +1237,12 @@ async function scheduleAllReminders() {
       });
     });
   } catch(e) {
-    console.warn('OneSignal no disponible, usando fallback');
+    console.warn('OneSignal no disponible');
   }
 }
 
 // ── Theme ──
 const themes = ['auto', 'light', 'dark'];
-const themeLabels = { auto: 'Automático', light: 'Claro', dark: 'Oscuro' };
 let currentTheme = localStorage.getItem('theme') || 'auto';
 
 function applyTheme() {
@@ -1280,7 +1261,6 @@ function setTheme(theme) {
 }
 
 applyTheme();
-
 
 // ── Completion tracking ──
 let completionTimer = null;
@@ -1325,9 +1305,7 @@ function startCompletionTimer(gameName) {
   currentGameForCompletion = gameName;
   gameStartTime = Date.now();
   if (completionTimer) clearTimeout(completionTimer);
-  completionTimer = setTimeout(() => {
-    // Marcar que está listo para preguntar al salir
-  }, 30000);
+  completionTimer = setTimeout(() => {}, 30000);
 }
 
 function stopCompletionTimer() {
@@ -1337,20 +1315,14 @@ function stopCompletionTimer() {
   completionTimer = null;
   currentGameForCompletion = null;
   gameStartTime = null;
-
   if (!gameName) return;
-
   const completions = loadCompletions();
-  if (gameName in completions) return; // ya respondió antes
-
-  if (elapsed >= 30000) {
-    showCompletionPopup(gameName);
-  }
+  if (gameName in completions) return;
+  if (elapsed >= 30000) showCompletionPopup(gameName);
 }
 
 function showCompletionPopup(gameName) {
-  document.getElementById('completion-title').textContent =
-    `¿Completaste ${gameName}?`;
+  document.getElementById('completion-title').textContent = `¿Completaste ${gameName}?`;
   document.getElementById('completion-popup').dataset.game = gameName;
   document.getElementById('completion-popup').classList.add('show');
 }
@@ -1362,7 +1334,6 @@ function answerCompletion(completed) {
   if (completed) updateStreak(gameName);
 }
 
-// Medianoche reset
 function scheduleCompletionReset() {
   const now = new Date();
   const midnight = new Date();
@@ -1375,6 +1346,7 @@ function scheduleCompletionReset() {
     scheduleCompletionReset();
   }, ms);
 }
+
 scheduleCompletionReset();
 
 // ── Streaks ──
@@ -1388,10 +1360,8 @@ async function getOnesignalId() {
 async function loadStreaks() {
   const uid = await getOnesignalId();
   if (!uid) return JSON.parse(localStorage.getItem('streaks') || '{}');
-
   const { data } = await db.from('streaks').select('*').eq('onesignal_id', uid);
   if (!data) return {};
-
   const result = {};
   data.forEach(row => {
     result[row.game] = { count: row.count, lastDay: row.last_day };
@@ -1404,25 +1374,19 @@ async function updateStreak(gameName) {
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   const uid = await getOnesignalId();
-
   const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
   const s = streaks[gameName] || { count: 0, lastDay: null };
-
   if (s.lastDay === today) return;
   const newCount = s.lastDay === yesterday ? s.count + 1 : 1;
-  const updated = { count: newCount, lastDay: today };
-
-  streaks[gameName] = updated;
+  streaks[gameName] = { count: newCount, lastDay: today };
   localStorage.setItem('streaks', JSON.stringify(streaks));
-  renderStreaks();
-
+  await renderStreaks();
   if (uid) {
     const { data } = await db.from('streaks')
       .select('id')
       .eq('onesignal_id', uid)
       .eq('game', gameName)
       .single();
-
     if (data) {
       await db.from('streaks').update({
         count: newCount,
@@ -1444,12 +1408,10 @@ async function renderStreaks() {
   const streaks = await loadStreaks();
   const completions = loadCompletions();
   const today = new Date().toDateString();
-
   document.querySelectorAll('.game-card').forEach(card => {
     const name = card.dataset.name;
     const existing = card.querySelector('.streak-badge');
     if (existing) existing.remove();
-
     const s = streaks[name];
     if (s && s.count > 0) {
       const badge = document.createElement('div');

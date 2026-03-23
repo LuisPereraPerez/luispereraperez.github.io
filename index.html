@@ -610,11 +610,9 @@
   }
   .completion-btn:active { opacity: 0.75; }
 
-  .streak-badge {
+.streak-badge {
     position: absolute;
     top: 10px; right: 10px;
-    background: #ff6b2b;
-    color: white;
     border-radius: 20px;
     padding: 3px 8px;
     font-size: 11px;
@@ -622,6 +620,11 @@
     display: flex;
     align-items: center;
     gap: 3px;
+    background: #c0bdb7;
+    color: white;
+  }
+  .streak-badge.active {
+    background: #ff6b2b;
   }
   .streak-badge.with-completion {
     right: 36px;
@@ -1401,6 +1404,7 @@ function updateStreak(gameName) {
 function renderStreaks() {
   const streaks = loadStreaks();
   const completions = loadCompletions();
+  const today = new Date().toDateString();
 
   document.querySelectorAll('.game-card').forEach(card => {
     const name = card.dataset.name;
@@ -1411,8 +1415,13 @@ function renderStreaks() {
     if (s && s.count > 0) {
       const badge = document.createElement('div');
       badge.className = 'streak-badge';
-      // Si hay tick de completado, desplaza la racha a la izquierda
       if (completions[name] === true) badge.classList.add('with-completion');
+
+      // Naranja si completado hoy, gris si pendiente
+      if (s.lastDay === today) {
+        badge.classList.add('active');
+      }
+
       badge.innerHTML = `🔥 ${s.count}`;
       card.appendChild(badge);
     }

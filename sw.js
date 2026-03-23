@@ -1,4 +1,4 @@
-const CACHE = 'minijuegos-v7';
+const CACHE = 'minijuegos-v3';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
@@ -15,7 +15,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request).catch(() => caches.match(e.request))
   );
 });
 

@@ -1378,31 +1378,70 @@ function scheduleCompletionReset() {
 scheduleCompletionReset();
 
 // ── Streaks ──
-function loadStreaks() {
-  return JSON.parse(localStorage.getItem('streaks') || '{}');
+async function getOnesignalId() {
+  try {
+    const OneSignal = await getOneSignal();
+    return await OneSignal.User.PushSubscription.id;
+  } catch(e) { return null; }
 }
 
-function updateStreak(gameName) {
-  const streaks = loadStreaks();
+async function loadStreaks() {
+  const uid = await getOnesignalId();
+  if (!uid) return JSON.parse(localStorage.getItem('streaks') || '{}');
+
+  const { data } = await db.from('streaks').select('*').eq('onesignal_id', uid);
+  if (!data) return {};
+
+  const result = {};
+  data.forEach(row => {
+    result[row.game] = { count: row.count, lastDay: row.last_day };
+  });
+  localStorage.setItem('streaks', JSON.stringify(result));
+  return result;
+}
+
+async function updateStreak(gameName) {
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
+  const uid = await getOnesignalId();
 
+  const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
   const s = streaks[gameName] || { count: 0, lastDay: null };
 
-  if (s.lastDay === today) return; // ya contó hoy
-  if (s.lastDay === yesterday) {
-    s.count += 1; // día consecutivo
-  } else {
-    s.count = 1; // racha rota, empieza de nuevo
-  }
-  s.lastDay = today;
-  streaks[gameName] = s;
+  if (s.lastDay === today) return;
+  const newCount = s.lastDay === yesterday ? s.count + 1 : 1;
+  const updated = { count: newCount, lastDay: today };
+
+  streaks[gameName] = updated;
   localStorage.setItem('streaks', JSON.stringify(streaks));
   renderStreaks();
+
+  if (uid) {
+    const { data } = await db.from('streaks')
+      .select('id')
+      .eq('onesignal_id', uid)
+      .eq('game', gameName)
+      .single();
+
+    if (data) {
+      await db.from('streaks').update({
+        count: newCount,
+        last_day: today,
+        updated_at: new Date().toISOString()
+      }).eq('id', data.id);
+    } else {
+      await db.from('streaks').insert({
+        onesignal_id: uid,
+        game: gameName,
+        count: newCount,
+        last_day: today
+      });
+    }
+  }
 }
 
-function renderStreaks() {
-  const streaks = loadStreaks();
+async function renderStreaks() {
+  const streaks = await loadStreaks();
   const completions = loadCompletions();
   const today = new Date().toDateString();
 
@@ -1416,12 +1455,7 @@ function renderStreaks() {
       const badge = document.createElement('div');
       badge.className = 'streak-badge';
       if (completions[name] === true) badge.classList.add('with-completion');
-
-      // Naranja si completado hoy, gris si pendiente
-      if (s.lastDay === today) {
-        badge.classList.add('active');
-      }
-
+      if (s.lastDay === today) badge.classList.add('active');
       badge.innerHTML = `🔥 ${s.count}`;
       card.appendChild(badge);
     }

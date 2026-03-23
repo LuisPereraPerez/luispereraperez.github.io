@@ -997,15 +997,15 @@ let notifTimers = [];
 let onesignalUserId = null;
 
 // ── Init ──
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   setDateLabel();
   setupGameCards();
   setupDayChips();
   renderReminders();
   checkNotifPermission();
   scheduleAllReminders();
-  renderCompletions();  // primero completions
-  renderStreaks();      // luego streaks
+  renderCompletions();
+  await renderStreaks();
   scheduleCompletionReset();
 
   if ('serviceWorker' in navigator) {

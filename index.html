@@ -1275,6 +1275,7 @@ function saveCompletion(gameName, completed) {
   completions[gameName] = completed;
   localStorage.setItem('completions', JSON.stringify(completions));
   renderCompletions();
+  renderStreaks();
 }
 
 function renderCompletions() {

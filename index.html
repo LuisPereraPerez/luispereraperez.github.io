@@ -609,26 +609,6 @@
     color: white;
   }
   .completion-btn:active { opacity: 0.75; }
-
-.streak-badge {
-    position: absolute;
-    top: 10px; right: 10px;
-    border-radius: 20px;
-    padding: 3px 8px;
-    font-size: 11px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    background: #c0bdb7;
-    color: white;
-  }
-  .streak-badge.active {
-    background: #ff6b2b;
-  }
-  .streak-badge.with-completion {
-    right: 36px;
-  }
 </style>
 </head>
 <body>
@@ -1003,7 +983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkNotifPermission();
   scheduleAllReminders();
   renderCompletions();
-  await renderStreaks();
+  await
   scheduleCompletionReset();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -1275,7 +1255,6 @@ function saveCompletion(gameName, completed) {
   completions[gameName] = completed;
   localStorage.setItem('completions', JSON.stringify(completions));
   renderCompletions();
-  renderStreaks();
 }
 
 function renderCompletions() {
@@ -1284,15 +1263,11 @@ function renderCompletions() {
     const name = card.dataset.name;
     const existing = card.querySelector('.completed-badge');
     if (existing) existing.remove();
-    const streakBadge = card.querySelector('.streak-badge');
     if (completions[name] === true) {
       const badge = document.createElement('div');
       badge.className = 'completed-badge';
       badge.textContent = '✓';
       card.appendChild(badge);
-      if (streakBadge) streakBadge.classList.add('with-completion');
-    } else {
-      if (streakBadge) streakBadge.classList.remove('with-completion');
     }
   });
 }
@@ -1327,7 +1302,6 @@ async function answerCompletion(completed) {
   const gameName = document.getElementById('completion-popup').dataset.game;
   document.getElementById('completion-popup').classList.remove('show');
   if (gameName) saveCompletion(gameName, completed);
-  if (completed) await updateStreak(gameName);
 }
 
 function scheduleCompletionReset() {
@@ -1366,110 +1340,15 @@ async function getUserId() {
   return osId || getDeviceId();
 }
 
-async function loadStreaks() {
-  const uid = await getUserId();
-  if (!uid) return JSON.parse(localStorage.getItem('streaks') || '{}');
-  const { data } = await db.from('streaks').select('*').eq('onesignal_id', uid);
-  if (!data) return {};
-  const result = {};
-  data.forEach(row => {
-    result[row.game] = { count: row.count, lastDay: row.last_day };
-  });
-  localStorage.setItem('streaks', JSON.stringify(result));
-  return result;
-}
-
-async function updateStreak(gameName) {
-  const today = new Date().toDateString();
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
-  const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
-  const s = streaks[gameName] || { count: 0, lastDay: null };
-  if (s.lastDay === today) return;
-  const newCount = s.lastDay === yesterday ? s.count + 1 : 1;
-  streaks[gameName] = { count: newCount, lastDay: today };
-  localStorage.setItem('streaks', JSON.stringify(streaks));
-  // Pintar al instante desde localStorage, sin esperar red
-  renderStreaksFromLocal();
-  // Sincronizar con Supabase en segundo plano, con reintentos si OneSignal no está listo
-  syncStreakToSupabase(gameName, newCount, today);
-}
 
 
-async function syncStreakToSupabase(gameName, count, lastDay, attempts = 0) {
-  try {
-    let uid = await getUserId();
-    console.log('[streak] uid:', uid, 'game:', gameName, 'count:', count);
-    const { data, error: selError } = await db.from('streaks')
-      .select('id')
-      .eq('onesignal_id', uid)
-      .eq('game', gameName)
-      .maybeSingle();
-    console.log('[streak] select:', data, selError);
-    if (data) {
-      const { error: upError } = await db.from('streaks').update({
-        count,
-        last_day: lastDay,
-        updated_at: new Date().toISOString()
-      }).eq('id', data.id);
-      console.log('[streak] update error:', upError);
-    } else {
-      const { error: insError } = await db.from('streaks').insert({
-        onesignal_id: uid,
-        game: gameName,
-        count,
-        last_day: lastDay
-      });
-      console.log('[streak] insert error:', insError);
-    }
-  } catch(e) {
-    console.error('[streak] catch:', e);
-    if (attempts < 5) {
-      setTimeout(() => syncStreakToSupabase(gameName, count, lastDay, attempts + 1), 3000);
-    }
-  }
-}
-function renderStreaksFromLocal() {
-  const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
-  const completions = loadCompletions();
-  const today = new Date().toDateString();
-  document.querySelectorAll('.game-card').forEach(card => {
-    const name = card.dataset.name;
-    const existing = card.querySelector('.streak-badge');
-    if (existing) existing.remove();
-    const s = streaks[name];
-    if (s && s.count > 0) {
-      const badge = document.createElement('div');
-      badge.className = 'streak-badge';
-      if (completions[name] === true) badge.classList.add('with-completion');
-      if (s.lastDay === today) badge.classList.add('active');
-      badge.innerHTML = `🔥 ${s.count}`;
-      card.appendChild(badge);
-    }
-  });
-}
 
-async function renderStreaks() {
-  // Pintar primero desde localStorage (instantáneo)
-  renderStreaksFromLocal();
-  // Luego sincronizar desde Supabase y repintar si hay cambios
-  const streaks = await loadStreaks();
-  const completions = loadCompletions();
-  const today = new Date().toDateString();
-  document.querySelectorAll('.game-card').forEach(card => {
-    const name = card.dataset.name;
-    const existing = card.querySelector('.streak-badge');
-    if (existing) existing.remove();
-    const s = streaks[name];
-    if (s && s.count > 0) {
-      const badge = document.createElement('div');
-      badge.className = 'streak-badge';
-      if (completions[name] === true) badge.classList.add('with-completion');
-      if (s.lastDay === today) badge.classList.add('active');
-      badge.innerHTML = `🔥 ${s.count}`;
-      card.appendChild(badge);
-    }
-  });
-}
+
+
+
+
+
+
 </script>
 </body>
 </html>

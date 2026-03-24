@@ -1398,26 +1398,31 @@ async function updateStreak(gameName) {
 async function syncStreakToSupabase(gameName, count, lastDay, attempts = 0) {
   try {
     let uid = await getUserId();
-    const { data } = await db.from('streaks')
+    console.log('[streak] uid:', uid, 'game:', gameName, 'count:', count);
+    const { data, error: selError } = await db.from('streaks')
       .select('id')
       .eq('onesignal_id', uid)
       .eq('game', gameName)
       .maybeSingle();
+    console.log('[streak] select:', data, selError);
     if (data) {
-      await db.from('streaks').update({
+      const { error: upError } = await db.from('streaks').update({
         count,
         last_day: lastDay,
         updated_at: new Date().toISOString()
       }).eq('id', data.id);
+      console.log('[streak] update error:', upError);
     } else {
-      await db.from('streaks').insert({
+      const { error: insError } = await db.from('streaks').insert({
         onesignal_id: uid,
         game: gameName,
         count,
         last_day: lastDay
       });
+      console.log('[streak] insert error:', insError);
     }
   } catch(e) {
+    console.error('[streak] catch:', e);
     if (attempts < 5) {
       setTimeout(() => syncStreakToSupabase(gameName, count, lastDay, attempts + 1), 3000);
     }

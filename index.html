@@ -1284,11 +1284,15 @@ function renderCompletions() {
     const name = card.dataset.name;
     const existing = card.querySelector('.completed-badge');
     if (existing) existing.remove();
+    const streakBadge = card.querySelector('.streak-badge');
     if (completions[name] === true) {
       const badge = document.createElement('div');
       badge.className = 'completed-badge';
       badge.textContent = '✓';
       card.appendChild(badge);
+      if (streakBadge) streakBadge.classList.add('with-completion');
+    } else {
+      if (streakBadge) streakBadge.classList.remove('with-completion');
     }
   });
 }
@@ -1364,15 +1368,17 @@ async function loadStreaks() {
 async function updateStreak(gameName) {
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
-  const uid = await getOnesignalId();
   const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
   const s = streaks[gameName] || { count: 0, lastDay: null };
   if (s.lastDay === today) return;
   const newCount = s.lastDay === yesterday ? s.count + 1 : 1;
   streaks[gameName] = { count: newCount, lastDay: today };
   localStorage.setItem('streaks', JSON.stringify(streaks));
-  await renderStreaks();
-  if (uid) {
+  // Pintar al instante desde localStorage, sin esperar red
+  renderStreaksFromLocal();
+  // Sincronizar con Supabase en segundo plano
+  getOnesignalId().then(async uid => {
+    if (!uid) return;
     const { data } = await db.from('streaks')
       .select('id')
       .eq('onesignal_id', uid)
@@ -1392,10 +1398,33 @@ async function updateStreak(gameName) {
         last_day: today
       });
     }
-  }
+  }).catch(() => {});
+}
+
+function renderStreaksFromLocal() {
+  const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
+  const completions = loadCompletions();
+  const today = new Date().toDateString();
+  document.querySelectorAll('.game-card').forEach(card => {
+    const name = card.dataset.name;
+    const existing = card.querySelector('.streak-badge');
+    if (existing) existing.remove();
+    const s = streaks[name];
+    if (s && s.count > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'streak-badge';
+      if (completions[name] === true) badge.classList.add('with-completion');
+      if (s.lastDay === today) badge.classList.add('active');
+      badge.innerHTML = `🔥 ${s.count}`;
+      card.appendChild(badge);
+    }
+  });
 }
 
 async function renderStreaks() {
+  // Pintar primero desde localStorage (instantáneo)
+  renderStreaksFromLocal();
+  // Luego sincronizar desde Supabase y repintar si hay cambios
   const streaks = await loadStreaks();
   const completions = loadCompletions();
   const today = new Date().toDateString();

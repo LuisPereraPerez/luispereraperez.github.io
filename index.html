@@ -1352,8 +1352,22 @@ async function getOnesignalId() {
   } catch(e) { return null; }
 }
 
+function getDeviceId() {
+  let id = localStorage.getItem('device_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('device_id', id);
+  }
+  return id;
+}
+
+async function getUserId() {
+  const osId = await getOnesignalId();
+  return osId || getDeviceId();
+}
+
 async function loadStreaks() {
-  const uid = await getOnesignalId();
+  const uid = await getUserId();
   if (!uid) return JSON.parse(localStorage.getItem('streaks') || '{}');
   const { data } = await db.from('streaks').select('*').eq('onesignal_id', uid);
   if (!data) return {};
@@ -1383,12 +1397,7 @@ async function updateStreak(gameName) {
 
 async function syncStreakToSupabase(gameName, count, lastDay, attempts = 0) {
   try {
-    let uid = await getOnesignalId();
-    if (!uid && attempts < 5) {
-      setTimeout(() => syncStreakToSupabase(gameName, count, lastDay, attempts + 1), 2000);
-      return;
-    }
-    if (!uid) return;
+    let uid = await getUserId();
     const { data } = await db.from('streaks')
       .select('id')
       .eq('onesignal_id', uid)

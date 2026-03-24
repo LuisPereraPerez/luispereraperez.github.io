@@ -1376,8 +1376,18 @@ async function updateStreak(gameName) {
   localStorage.setItem('streaks', JSON.stringify(streaks));
   // Pintar al instante desde localStorage, sin esperar red
   renderStreaksFromLocal();
-  // Sincronizar con Supabase en segundo plano
-  getOnesignalId().then(async uid => {
+  // Sincronizar con Supabase en segundo plano, con reintentos si OneSignal no está listo
+  syncStreakToSupabase(gameName, newCount, today);
+}
+
+
+async function syncStreakToSupabase(gameName, count, lastDay, attempts = 0) {
+  try {
+    let uid = await getOnesignalId();
+    if (!uid && attempts < 5) {
+      setTimeout(() => syncStreakToSupabase(gameName, count, lastDay, attempts + 1), 2000);
+      return;
+    }
     if (!uid) return;
     const { data } = await db.from('streaks')
       .select('id')
@@ -1386,21 +1396,24 @@ async function updateStreak(gameName) {
       .maybeSingle();
     if (data) {
       await db.from('streaks').update({
-        count: newCount,
-        last_day: today,
+        count,
+        last_day: lastDay,
         updated_at: new Date().toISOString()
       }).eq('id', data.id);
     } else {
       await db.from('streaks').insert({
         onesignal_id: uid,
         game: gameName,
-        count: newCount,
-        last_day: today
+        count,
+        last_day: lastDay
       });
     }
-  }).catch(() => {});
+  } catch(e) {
+    if (attempts < 5) {
+      setTimeout(() => syncStreakToSupabase(gameName, count, lastDay, attempts + 1), 3000);
+    }
+  }
 }
-
 function renderStreaksFromLocal() {
   const streaks = JSON.parse(localStorage.getItem('streaks') || '{}');
   const completions = loadCompletions();
